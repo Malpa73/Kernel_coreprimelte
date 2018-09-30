@@ -1,5 +1,6 @@
 /*
- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
+ * Copyright © 2018,   DragO0nFly <greekgod97ak47@gmail.com>
+ * Copyright (c) 2013-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -47,6 +48,7 @@ static struct mux_div_clk a7ssmux = {
 	.div_mask = BM(4, 0),
 	.src_mask = BM(10, 8) >> 8,
 	.src_shift = 8,
+	.en_mask = 1,
 };
 
 static struct clk_lookup clock_tbl_a7[] = {
@@ -168,18 +170,40 @@ static void get_speed_bin_b(struct platform_device *pdev, int *bin,
 {
 	struct resource *res;
 	void __iomem *base;
-	u32 pte_efuse;
+	u32 pte_efuse, shift = 2, mask = 0x7;
 
 	*bin = 0;
 	*version = 0;
 
-	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "efuse");
-	if (!res) {
-			dev_info(&pdev->dev,
-				"No speed/PVS binning available. Defaulting to 0!\n");
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "efuse1");
+	if (res) {
+		base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
+		if (base) {
+			pte_efuse = readl_relaxed(base);
+			devm_iounmap(&pdev->dev, base);
+
+			*version = (pte_efuse >> 18) & 0x3;
+			if (!(*version)) {
+				*bin = (pte_efuse >> 23) & 0x3;
+				if (*bin) {
+					dev_info(&pdev->dev, "Speed bin: %d PVS Version: %d\n",
+						*bin, *version);
+					return;
+				}
+			}
+		} else {
+			dev_warn(&pdev->dev,
+				"Unable to read efuse1 data. Defaulting to 0!\n");
 			return;
 		}
+	}
 
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "efuse");
+	if (!res) {
+		dev_info(&pdev->dev,
+				"No speed/PVS binning available. Defaulting to 0!\n");
+		return;
+	}
 	base = devm_ioremap(&pdev->dev, res->start, resource_size(res));
 	if (!base) {
 		dev_warn(&pdev->dev,
@@ -190,7 +214,7 @@ static void get_speed_bin_b(struct platform_device *pdev, int *bin,
 	pte_efuse = readl_relaxed(base);
 	devm_iounmap(&pdev->dev, base);
 
-	*bin = (pte_efuse >> 2) & 0x7;
+	*bin = (pte_efuse >> shift) & mask;
 
 	dev_info(&pdev->dev, "Speed bin: %d PVS Version: %d\n", *bin,
 								*version);
@@ -239,9 +263,13 @@ static int clock_a7_probe(struct platform_device *pdev)
 	char prop_name[] = "qcom,speedX-bin-vX";
 	const void *prop;
 	bool compat_bin = false;
+	bool compat_bin2 = false;
+	bool opp_enable;
 
 	compat_bin = of_device_is_compatible(pdev->dev.of_node,
 						"qcom,clock-a53-8916");
+	compat_bin2 = of_device_is_compatible(pdev->dev.of_node,
+						"qcom,clock-a7-mdm9607");
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "rcg-base");
 	if (!res) {
@@ -272,7 +300,7 @@ static int clock_a7_probe(struct platform_device *pdev)
 	if (prop)
 		a7ssmux.safe_freq = of_read_ulong(prop, 1);
 
-	if (compat_bin)
+	if (compat_bin || compat_bin2)
 		get_speed_bin_b(pdev, &speed_bin, &version);
 	else
 		get_speed_bin(pdev, &speed_bin, &version);
@@ -329,8 +357,10 @@ static struct of_device_id clock_a7_match_table[] = {
 	{.compatible = "qcom,clock-a7-8226"},
 	{.compatible = "qcom,clock-a7-krypton"},
 	{.compatible = "qcom,clock-a7-9630"},
-	{.compatible = "qcom,clock-a7-zirc"},
+	{.compatible = "qcom,clock-a7-9640"},
 	{.compatible = "qcom,clock-a53-8916"},
+	{.compatible = "qcom,clock-a7-californium"},
+	{.compatible = "qcom,clock-a7-mdm9607"},
 	{}
 };
 
