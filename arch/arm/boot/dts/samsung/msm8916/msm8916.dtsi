@@ -427,7 +427,6 @@
 	};
 
 	cpubw: qcom,cpubw@0 {
-		reg = <0 4>;
 		compatible = "qcom,devbw";
 		governor = "cpufreq";
 		qcom,src-dst-ports = <1 512>;
