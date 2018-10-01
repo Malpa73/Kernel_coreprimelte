@@ -4,6 +4,7 @@
 menuconfig SLIMBUS
 	bool "Slimbus support"
 	depends on HAS_IOMEM
+	default y
 	help
 	  Slimbus is standard interface between baseband and
 	  application processors and peripheral components in mobile
@@ -18,6 +19,7 @@ config SLIMBUS_MSM_CTRL
 
 config SLIMBUS_MSM_NGD
 	tristate "Qualcomm Slimbus Satellite Component"
+	default y
 	help
 	  Select driver for Qualcomm's Slimbus Satellite Component.
 	  This is light-weight slimbus controller driver responsible for
