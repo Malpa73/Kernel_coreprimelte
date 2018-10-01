@@ -149,7 +149,7 @@ static void cs_check_cpu(int cpu, unsigned int load)
 static void cs_dbs_timer(struct work_struct *work)
 {
 	struct cs_cpu_dbs_info_s *dbs_info = container_of(work,
-			struct cs_cpu_dbs_info_s, cdbs.dwork.work);
+			struct cs_cpu_dbs_info_s, cdbs.work.work);
 	unsigned int cpu = dbs_info->cdbs.cur_policy->cpu;
 	struct cs_cpu_dbs_info_s *core_dbs_info = &per_cpu(cs_cpu_dbs_info,
 			cpu);
@@ -428,7 +428,6 @@ static struct cs_dbs_tuners *alloc_tuners(struct cpufreq_policy *policy)
 	tuners = kzalloc(sizeof(*tuners), GFP_KERNEL);
 	if (!tuners) {
 		pr_err("%s: kzalloc failed\n", __func__);
-		return ERR_PTR(-ENOMEM);
 	}
 
 	tuners->up_threshold = DEF_FREQUENCY_UP_THRESHOLD;
@@ -463,8 +462,6 @@ static int cs_init(struct dbs_data *dbs_data, struct cpufreq_policy *policy)
 	tuners = restore_tuners(policy);
 	if (!tuners) {
 		tuners = alloc_tuners(policy);
-		if (IS_ERR(tuners))
-			return PTR_ERR(tuners);
 	}
 
 	dbs_data->tuners = tuners;
