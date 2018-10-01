@@ -432,10 +432,10 @@
 		qcom,src-dst-ports = <1 512>;
 		qcom,active-only;
 		qcom,bw-tbl =
-			<  762 /* 100 MHz */>,
-			< 1525 /* 200 MHz */>,
-			< 3051 /* 400 MHz */>,
-			< 4066 /* 533 MHz */>;
+			<  762 /* 100  MHz */>,
+			< 1525 /* 200  MHz */>,
+			< 3051 /* 400  MHz */>,
+			< 4066 /* 533  MHz */>;
 	};
 
 	qcom,armbw-pm {
