@@ -103,6 +103,11 @@ static void sdhci_dump_state(struct sdhci_host *host)
 		mmc_hostname(mmc), host->clock, mmc->clk_gated,
 		mmc->claimer->comm, host->pwr);
 	sdhci_dump_rpm_info(host);
+	if (mmc->card) {
+		pr_info("%s: card->cid : %08x%08x%08x%08x\n", mmc_hostname(mmc), 
+			mmc->card->raw_cid[0], mmc->card->raw_cid[1], 
+			mmc->card->raw_cid[2], mmc->card->raw_cid[3]);
+	}
 }
 
 static void sdhci_dumpregs(struct sdhci_host *host)
@@ -269,6 +274,7 @@ static void sdhci_reset(struct sdhci_host *host, u8 mask)
 	if (host->ops->platform_reset_enter)
 		host->ops->platform_reset_enter(host, mask);
 
+ retry_reset:
 	sdhci_writeb(host, mask, SDHCI_SOFTWARE_RESET);
 
 	if (mask & SDHCI_RESET_ALL)
@@ -286,6 +292,26 @@ static void sdhci_reset(struct sdhci_host *host, u8 mask)
 		if (timeout == 0) {
 			pr_err("%s: Reset 0x%x never completed.\n",
 				mmc_hostname(host->mmc), (int)mask);
+			if ((host->quirks2 & SDHCI_QUIRK2_USE_RESET_WORKAROUND)
+					&& host->ops->reset_workaround) {
+				if (!host->reset_wa_applied) {
+					/*
+					 * apply the workaround and issue
+					 * reset again.
+					 */
+					host->ops->reset_workaround(host, 1);
+					host->reset_wa_applied = 1;
+					host->reset_wa_cnt++;
+					goto retry_reset;
+				} else {
+					pr_err("%s: Reset 0x%x failed with workaround\n",
+							mmc_hostname(host->mmc),
+							(int)mask);
+					/* clear the workaround */
+					host->ops->reset_workaround(host, 0);
+					host->reset_wa_applied = 0;
+				}
+			}
 			sdhci_dumpregs(host);
 			return;
 		}
@@ -295,6 +321,15 @@ static void sdhci_reset(struct sdhci_host *host, u8 mask)
 
 	if (host->ops->platform_reset_exit)
 		host->ops->platform_reset_exit(host, mask);
+
+	if ((host->quirks2 & SDHCI_QUIRK2_USE_RESET_WORKAROUND) &&
+			host->ops->reset_workaround && host->reset_wa_applied) {
+		pr_info("%s: Reset 0x%x successful with workaround\n",
+				mmc_hostname(host->mmc), (int)mask);
+		/* clear the workaround */
+		host->ops->reset_workaround(host, 0);
+		host->reset_wa_applied = 0;
+	}
 
 	/* clear pending normal/error interrupt status */
 	sdhci_writel(host, sdhci_readl(host, SDHCI_INT_STATUS),
@@ -1065,14 +1100,8 @@ static void sdhci_set_transfer_mode(struct sdhci_host *host,
 
 	if (data->flags & MMC_DATA_READ) {
 		mode |= SDHCI_TRNS_READ;
-		if (host->ops->toggle_cdr) {
-			if ((cmd->opcode == MMC_SEND_TUNING_BLOCK_HS200) ||
-				(cmd->opcode == MMC_SEND_TUNING_BLOCK_HS400) ||
-				(cmd->opcode == MMC_SEND_TUNING_BLOCK))
-				host->ops->toggle_cdr(host, false);
-			else
-				host->ops->toggle_cdr(host, true);
-		}
+		if (host->ops->toggle_cdr)
+			host->ops->toggle_cdr(host, true);
 	}
 	if (host->ops->toggle_cdr && (data->flags & MMC_DATA_WRITE))
 		host->ops->toggle_cdr(host, false);

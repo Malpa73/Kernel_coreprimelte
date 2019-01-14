@@ -162,7 +162,9 @@ extern unsigned long nr_running(void);
 extern unsigned long nr_iowait(void);
 extern unsigned long nr_iowait_cpu(int cpu);
 extern unsigned long this_cpu_load(void);
-
+#ifdef CONFIG_RUNTIME_COMPCACHE
+extern unsigned long this_cpu_loadx(int i);
+#endif /* CONFIG_RUNTIME_COMPCACHE */
 extern void sched_update_nr_prod(int cpu, unsigned long nr, bool inc);
 extern void sched_get_nr_running_avg(int *avg, int *iowait_avg);
 
@@ -740,6 +742,8 @@ struct user_struct {
 	unsigned long mq_bytes;	/* How many bytes can be allocated to mqueue? */
 #endif
 	unsigned long locked_shm; /* How many pages of mlocked shm ? */
+	unsigned long unix_inflight;	/* How many files in flight in unix sockets */
+	atomic_long_t pipe_bufs;  /* how many pages are allocated in pipe buffers */
 
 #ifdef CONFIG_KEYS
 	struct key *uid_keyring;	/* UID specific keyring */

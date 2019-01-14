@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -723,8 +723,8 @@ static void kgsl_detach_pagetable_iommu_domain(struct kgsl_mmu *mmu)
 				iommu_detach_device(iommu_pt->domain,
 						iommu_unit->dev[j].dev);
 				iommu_unit->dev[j].attached = false;
-				KGSL_MEM_INFO(mmu->device, "iommu %p detached "
-					"from user dev of MMU: %p\n",
+				KGSL_MEM_INFO(mmu->device, "iommu %pK detached "
+					"from user dev of MMU: %pK\n",
 					iommu_pt->domain, mmu);
 			}
 		}
@@ -788,7 +788,7 @@ static int kgsl_attach_pagetable_iommu_domain(struct kgsl_mmu *mmu)
 				}
 				iommu_unit->dev[j].attached = true;
 				KGSL_MEM_INFO(mmu->device,
-				"iommu pt %p attached to dev %p, ctx_id %d\n",
+				"iommu pt %pK attached to dev %pK, ctx_id %d\n",
 				iommu_pt->domain, iommu_unit->dev[j].dev,
 				iommu_unit->dev[j].ctx_id);
 				/* Init IOMMU unit clks here */
@@ -800,8 +800,6 @@ static int kgsl_attach_pagetable_iommu_domain(struct kgsl_mmu *mmu)
 					iommu_unit->clks[2] = drvdata->aclk;
 					iommu_unit->clks[3] =
 							iommu->gtcu_iface_clk;
-					iommu_unit->clks[4] =
-							iommu->gtbu_clk;
 				}
 			}
 		}
@@ -1313,7 +1311,6 @@ static int kgsl_iommu_init(struct kgsl_mmu *mmu)
 	int status = 0;
 	struct kgsl_iommu *iommu;
 	struct platform_device *pdev = mmu->device->pdev;
-	struct adreno_device *adreno_dev = ADRENO_DEVICE(mmu->device);
 	size_t secured_pool_sz = 0;
 
 	atomic_set(&mmu->fault, 0);
@@ -1336,13 +1333,6 @@ static int kgsl_iommu_init(struct kgsl_mmu *mmu)
 		of_property_match_string(pdev->dev.of_node, "clock-names",
 						"gtcu_iface_clk") >= 0)
 		iommu->gtcu_iface_clk = clk_get(&pdev->dev, "gtcu_iface_clk");
-
-	/* TBU clk needs to be voted for TLB invalidate on A405 */
-	if (adreno_is_a405(adreno_dev)) {
-		iommu->gtbu_clk = clk_get(&pdev->dev, "gtbu_clk");
-		if (IS_ERR(iommu->gtbu_clk))
-			iommu->gtbu_clk = NULL;
-	}
 
 	mmu->pt_base = KGSL_MMU_MAPPED_MEM_BASE;
 	mmu->pt_size = (KGSL_MMU_MAPPED_MEM_SIZE - secured_pool_sz);
