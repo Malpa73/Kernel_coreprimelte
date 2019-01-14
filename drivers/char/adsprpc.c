@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -525,7 +525,6 @@ static int context_alloc(struct fastrpc_apps *me, uint32_t kernel,
 		goto bail;
 
 	INIT_HLIST_NODE(&ctx->hn);
-    hlist_add_fake(&ctx->hn);
 	ctx->apps = me;
 	ctx->fdata = fdata;
 	ctx->pra = (remote_arg_t *)(&ctx[1]);

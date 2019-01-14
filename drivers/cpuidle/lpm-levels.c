@@ -42,7 +42,15 @@
 #include <asm/arch_timer.h>
 #include <asm/cacheflush.h>
 #include "lpm-levels.h"
+#include <linux/regulator/consumer.h>
+#include <linux/pinctrl/sec-pinmux.h>
+#include <linux/qpnp/pin.h>
+#ifdef CONFIG_SEC_GPIO_DVS
+#include <linux/secgpio_dvs.h>
+#endif
+#ifdef CONFIG_CX_VOTE_TURBO
 #include "lpm-workarounds.h"
+#endif
 #include <trace/events/power.h>
 #define CREATE_TRACE_POINTS
 #include <trace/events/trace_msm_low_power.h>
@@ -101,6 +109,12 @@ module_param_named(
 static int msm_pm_sleep_time_override;
 module_param_named(sleep_time_override,
 	msm_pm_sleep_time_override, int, S_IRUGO | S_IWUSR | S_IWGRP);
+
+#ifdef CONFIG_SEC_PM_DEBUG
+static int msm_pm_sleep_sec_debug;
+module_param_named(secdebug,
+	msm_pm_sleep_sec_debug, int, S_IRUGO | S_IWUSR | S_IWGRP);
+#endif
 
 static bool print_parsed_dt;
 module_param_named(
@@ -214,13 +228,7 @@ int set_l2_mode(struct low_power_ops *ops, int mode, bool notify_rpm)
 		lpm = MSM_SPM_MODE_DISABLED;
 		break;
 	}
-
-	/* Do not program L2 SPM enable bit. This will be set by TZ */
-	if (lpm_wa_get_skip_l2_spm())
-		rc = msm_spm_config_low_power_mode_addr(ops->spm, lpm,
-							true);
-	else
-		rc = msm_spm_config_low_power_mode(ops->spm, lpm, true);
+	rc = msm_spm_config_low_power_mode(ops->spm, lpm, true);
 
 	if (rc)
 		pr_err("%s: Failed to set L2 low power mode %d, ERR %d",
@@ -594,6 +602,14 @@ static void cluster_unprepare(struct lpm_cluster *cluster,
 	level = &cluster->levels[cluster->last_level];
 	if (level->notify_rpm) {
 		msm_rpm_exit_sleep();
+#ifdef CONFIG_CX_VOTE_TURBO
+		/* If RPM bumps up CX to turbo, unvote CX turbo vote
+		 * during exit of rpm assisted power collapse to
+		 * reduce the power impact
+		 */
+
+		lpm_wa_cx_unvote_send();
+#endif
 		msm_mpm_exit_sleep(from_idle);
 	}
 
@@ -824,8 +840,6 @@ static void register_cpu_lpm_stats(struct lpm_cpu *cpu,
 
 	lpm_stats_config_level("cpu", level_name, cpu->nlevels,
 			parent->stats, &parent->child_cpus);
-
-	kfree(level_name);
 }
 
 static void register_cluster_lpm_stats(struct lpm_cluster *cl,
@@ -865,6 +879,34 @@ static int lpm_suspend_prepare(void)
 	suspend_in_progress = true;
 	msm_mpm_suspend_prepare();
 	lpm_stats_suspend_enter();
+
+#ifdef CONFIG_SEC_GPIO_DVS
+	/************************ Caution !!! ****************************
+	 * This functiongit a must be located in appropriate SLEEP position
+	 * in accordance with the specification of each BB vendor.
+	 ************************ Caution !!! ****************************/
+	gpio_dvs_check_sleepgpio();
+#ifdef SECGPIO_SLEEP_DEBUGGING
+	/************************ Caution !!! ****************************/
+	/* This func. must be located in an appropriate position for GPIO SLEEP debugging
+	 * in accordance with the specification of each BB vendor, and
+	 * the func. must be called after calling the function "gpio_dvs_check_sleepgpio"
+	 */
+	/************************ Caution !!! ****************************/
+	gpio_dvs_set_sleepgpio();
+#endif
+#endif
+
+#ifdef CONFIG_SEC_PM
+	regulator_showall_enabled();
+#endif
+
+#ifdef CONFIG_SEC_PM_DEBUG
+	if (msm_pm_sleep_sec_debug) {
+		msm_gpio_print_enabled();
+		qpnp_debug_suspend_show();
+	}
+#endif
 
 	return 0;
 }
@@ -915,12 +957,10 @@ static int lpm_probe(struct platform_device *pdev)
 	int size;
 	struct kobject *module_kobj = NULL;
 
-	get_online_cpus();
 	lpm_root_node = lpm_of_parse_cluster(pdev);
 
 	if (IS_ERR_OR_NULL(lpm_root_node)) {
 		pr_err("%s(): Failed to probe low power modes\n", __func__);
-		put_online_cpus();
 		return PTR_ERR(lpm_root_node);
 	}
 
@@ -933,6 +973,7 @@ static int lpm_probe(struct platform_device *pdev)
 	 * core.  BUG in existing code but no known issues possibly because of
 	 * how late lpm_levels gets initialized.
 	 */
+	register_hotcpu_notifier(&lpm_cpu_nblk);
 	get_cpu();
 	on_each_cpu(setup_broadcast_timer, (void *)true, 1);
 	put_cpu();
@@ -943,7 +984,6 @@ static int lpm_probe(struct platform_device *pdev)
 	if (ret) {
 		pr_err("%s: Failed initializing scm_handoff_lock (%d)\n",
 			__func__, ret);
-		put_online_cpus();
 		return ret;
 	}
 
@@ -953,13 +993,12 @@ static int lpm_probe(struct platform_device *pdev)
 	register_cluster_lpm_stats(lpm_root_node, NULL);
 
 	ret = cluster_cpuidle_register(lpm_root_node);
-	put_online_cpus();
 	if (ret) {
 		pr_err("%s()Failed to register with cpuidle framework\n",
 				__func__);
 		goto failed;
 	}
-	register_hotcpu_notifier(&lpm_cpu_nblk);
+
 	module_kobj = kset_find_obj(module_kset, KBUILD_MODNAME);
 	if (!module_kobj) {
 		pr_err("%s: cannot find kobject for module %s\n",

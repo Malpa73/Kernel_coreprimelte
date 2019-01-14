@@ -156,7 +156,7 @@ static int ghsic_data_alloc_requests(struct usb_ep *ep, struct list_head *head,
 	struct usb_request	*req;
 	unsigned long		flags;
 
-	pr_debug("%s: ep:%s head:%pK num:%d cb:%pK", __func__,
+	pr_debug("%s: ep:%s head:%pK num:%d cb:%pK\n", __func__,
 			ep->name, head, num, cb);
 
 	for (i = 0; i < num; i++) {
@@ -508,7 +508,7 @@ static void ghsic_data_start_io(struct gdata_port *port)
 	spin_lock_irqsave(&port->tx_lock, flags);
 	ep_in = port->in;
 	spin_unlock_irqrestore(&port->tx_lock, flags);
-	pr_debug("%s: ep_in:%pK\n", __func__, ep_in);
+	pr_debug("%s: ep_in:%p\n", __func__, ep_in);
 
 	if (!ep_in) {
 		spin_lock_irqsave(&port->rx_lock, flags);

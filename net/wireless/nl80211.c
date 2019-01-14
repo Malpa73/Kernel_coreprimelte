@@ -310,7 +310,8 @@ static const struct nla_policy nl80211_policy[NL80211_ATTR_MAX+1] = {
 	[NL80211_ATTR_WPA_VERSIONS] = { .type = NLA_U32 },
 	[NL80211_ATTR_PID] = { .type = NLA_U32 },
 	[NL80211_ATTR_4ADDR] = { .type = NLA_U8 },
-	[NL80211_ATTR_PMKID] = { .len = WLAN_PMKID_LEN },
+	[NL80211_ATTR_PMKID] = { .type = NLA_BINARY,
+				 .len = WLAN_PMKID_LEN },
 	[NL80211_ATTR_DURATION] = { .type = NLA_U32 },
 	[NL80211_ATTR_COOKIE] = { .type = NLA_U64 },
 	[NL80211_ATTR_TX_RATES] = { .type = NLA_NESTED },
@@ -365,7 +366,6 @@ static const struct nla_policy nl80211_policy[NL80211_ATTR_MAX+1] = {
 	[NL80211_ATTR_SCAN_FLAGS] = { .type = NLA_U32 },
 	[NL80211_ATTR_P2P_CTWINDOW] = { .type = NLA_U8 },
 	[NL80211_ATTR_P2P_OPPPS] = { .type = NLA_U8 },
-	[NL80211_ATTR_LOCAL_MESH_POWER_MODE] = {. type = NLA_U32 },
 	[NL80211_ATTR_ACL_POLICY] = {. type = NLA_U32 },
 	[NL80211_ATTR_MAC_ADDRS] = { .type = NLA_NESTED },
 	[NL80211_ATTR_STA_CAPABILITY] = { .type = NLA_U16 },
@@ -4256,12 +4256,10 @@ static int nl80211_del_station(struct sk_buff *skb, struct genl_info *info)
 {
 	struct cfg80211_registered_device *rdev = info->user_ptr[0];
 	struct net_device *dev = info->user_ptr[1];
-	struct station_del_parameters params;
-
-	memset(&params, 0, sizeof(params));
+	u8 *mac_addr = NULL;
 
 	if (info->attrs[NL80211_ATTR_MAC])
-		params.mac = nla_data(info->attrs[NL80211_ATTR_MAC]);
+		mac_addr = nla_data(info->attrs[NL80211_ATTR_MAC]);
 
 	if (dev->ieee80211_ptr->iftype != NL80211_IFTYPE_AP &&
 	    dev->ieee80211_ptr->iftype != NL80211_IFTYPE_AP_VLAN &&
@@ -4272,28 +4270,7 @@ static int nl80211_del_station(struct sk_buff *skb, struct genl_info *info)
 	if (!rdev->ops->del_station)
 		return -EOPNOTSUPP;
 
-	if (info->attrs[NL80211_ATTR_MGMT_SUBTYPE]) {
-		params.subtype =
-			nla_get_u8(info->attrs[NL80211_ATTR_MGMT_SUBTYPE]);
-		if (params.subtype != IEEE80211_STYPE_DISASSOC >> 4 &&
-		    params.subtype != IEEE80211_STYPE_DEAUTH >> 4)
-			return -EINVAL;
-	} else {
-		/* Default to Deauthentication frame */
-		params.subtype = IEEE80211_STYPE_DEAUTH >> 4;
-	}
-
-	if (info->attrs[NL80211_ATTR_REASON_CODE]) {
-		params.reason_code =
-			nla_get_u16(info->attrs[NL80211_ATTR_REASON_CODE]);
-		if (params.reason_code == 0)
-			return -EINVAL; /* 0 is reserved */
-	} else {
-		/* Default to reason code 2 */
-		params.reason_code = WLAN_REASON_PREV_AUTH_NOT_VALID;
-	}
-
-	return rdev_del_station(rdev, dev, &params);
+	return rdev_del_station(rdev, dev, mac_addr);
 }
 
 static int nl80211_send_mpath(struct sk_buff *msg, u32 portid, u32 seq,
@@ -6091,7 +6068,9 @@ static int nl80211_dump_survey(struct sk_buff *skb,
 static bool nl80211_valid_wpa_versions(u32 wpa_versions)
 {
 	return !(wpa_versions & ~(NL80211_WPA_VERSION_1 |
-				  NL80211_WPA_VERSION_2));
+				  NL80211_WPA_VERSION_2 |
+/*SEC_PRODUCT_FEATURE_WLAN_SUPPORT_WAPI*/
+				  NL80211_WAPI_VERSION_1 ));
 }
 
 static int nl80211_authenticate(struct sk_buff *skb, struct genl_info *info)

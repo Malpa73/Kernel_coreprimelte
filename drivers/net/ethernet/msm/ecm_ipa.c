@@ -9,6 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+
 #include <linux/debugfs.h>
 #include <linux/errno.h>
 #include <linux/etherdevice.h>
@@ -185,10 +186,12 @@ static const struct net_device_ops ecm_ipa_netdev_ops = {
 	.ndo_get_stats = ecm_ipa_get_stats,
 };
 
+
 const struct file_operations ecm_ipa_debugfs_atomic_ops = {
 	.open = ecm_ipa_debugfs_atomic_open,
 	.read = ecm_ipa_debugfs_atomic_read,
 };
+
 
 static void ecm_ipa_msg_free_cb(void *buff, u32 len, u32 type)
 {
@@ -636,7 +639,6 @@ static void ecm_ipa_packet_receive_notify(void *priv,
 
 	skb->dev = ecm_ipa_ctx->net;
 	skb->protocol = eth_type_trans(skb, ecm_ipa_ctx->net);
-
 	result = netif_rx(skb);
 	if (result)
 		ECM_IPA_ERROR("fail on netif_rx\n");
@@ -1098,15 +1100,17 @@ static void ecm_ipa_destory_rm_resource(struct ecm_ipa_dev *ecm_ipa_ctx)
 	ECM_IPA_LOG_EXIT();
 }
 
+
 static int resource_request(struct ecm_ipa_dev *ecm_ipa_ctx)
 {
 	return ipa_rm_inactivity_timer_request_resource(
-		IPA_RM_RESOURCE_STD_ECM_PROD);
+			IPA_RM_RESOURCE_STD_ECM_PROD);
 }
 
 static void resource_release(struct ecm_ipa_dev *ecm_ipa_ctx)
 {
 	ipa_rm_inactivity_timer_release_resource(IPA_RM_RESOURCE_STD_ECM_PROD);
+
 }
 
 /**
@@ -1177,6 +1181,8 @@ static void ecm_ipa_tx_timeout(struct net_device *net)
 	net->stats.tx_errors++;
 }
 
+
+
 static int ecm_ipa_debugfs_atomic_open(struct inode *inode, struct file *file)
 {
 	struct ecm_ipa_dev *ecm_ipa_ctx = inode->i_private;
@@ -1202,6 +1208,7 @@ static int ecm_ipa_debugfs_init(struct ecm_ipa_dev *ecm_ipa_ctx)
 {
 	const mode_t flags_read_write = S_IRUGO | S_IWUGO;
 	const mode_t flags_read_only = S_IRUGO;
+	const mode_t flags_write_only = S_IWUGO;
 	struct dentry *file;
 
 	ECM_IPA_LOG_ENTRY();
@@ -1214,6 +1221,7 @@ static int ecm_ipa_debugfs_init(struct ecm_ipa_dev *ecm_ipa_ctx)
 		ECM_IPA_ERROR("could not create debugfs directory entry\n");
 		goto fail_directory;
 	}
+	
 	file = debugfs_create_u8("outstanding_high", flags_read_write,
 			ecm_ipa_ctx->directory, &ecm_ipa_ctx->outstanding_high);
 	if (!file) {
@@ -1226,6 +1234,7 @@ static int ecm_ipa_debugfs_init(struct ecm_ipa_dev *ecm_ipa_ctx)
 		ECM_IPA_ERROR("could not create outstanding_low file\n");
 		goto fail_file;
 	}
+	
 	file = debugfs_create_file("outstanding", flags_read_only,
 			ecm_ipa_ctx->directory,
 			ecm_ipa_ctx, &ecm_ipa_debugfs_atomic_ops);
@@ -1234,7 +1243,7 @@ static int ecm_ipa_debugfs_init(struct ecm_ipa_dev *ecm_ipa_ctx)
 		goto fail_file;
 	}
 
-	ECM_IPA_DEBUG("debugfs entries were created\n");
+
 	ECM_IPA_LOG_EXIT();
 
 	return 0;

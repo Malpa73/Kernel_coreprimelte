@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2014, 2017 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -45,6 +45,10 @@
 #include "pm-boot.h"
 #include "../../../arch/arm/mach-msm/clock.h"
 
+#ifdef CONFIG_SEC_DEBUG
+#include <linux/sec_debug.h>
+#endif
+
 #define SCM_CMD_TERMINATE_PC	(0x2)
 #define SCM_CMD_CORE_HOTPLUGGED (0x10)
 #define SCM_FLUSH_FLAG_MASK	(0x3)
@@ -89,7 +93,6 @@ static long *msm_pc_debug_counters;
 
 static cpumask_t retention_cpus;
 static DEFINE_SPINLOCK(retention_lock);
-static DEFINE_MUTEX(msm_pc_debug_mutex);
 
 static bool msm_pm_is_L1_writeback(void)
 {
@@ -269,6 +272,9 @@ static bool __ref msm_pm_spm_power_collapse(
 			cpu, __func__, entry);
 
 	msm_jtag_save_state();
+#ifdef CONFIG_SEC_DEBUG
+	secdbg_sched_msg("+pc(I:%d,R:%d)", from_idle, notify_rpm);
+#endif
 
 #ifdef CONFIG_CPU_V7
 	collapsed = save_cpu_regs ?
@@ -276,6 +282,10 @@ static bool __ref msm_pm_spm_power_collapse(
 #else
 	collapsed = save_cpu_regs ?
 		!cpu_suspend(0) : msm_pm_pc_hotplug();
+#endif
+
+#ifdef CONFIG_SEC_DEBUG
+	secdbg_sched_msg("-pc(%d)", collapsed);
 #endif
 
 	msm_jtag_restore_state();
@@ -719,48 +729,33 @@ static ssize_t msm_pc_debug_counters_file_read(struct file *file,
 		char __user *bufu, size_t count, loff_t *ppos)
 {
 	struct msm_pc_debug_counters_buffer *data;
-	ssize_t ret;
 
-	mutex_lock(&msm_pc_debug_mutex);
 	data = file->private_data;
 
-	if (!data) {
-		ret = -EINVAL;
-		goto exit;
-	}
+	if (!data)
+		return -EINVAL;
 
-	if (!bufu) {
-		ret = -EINVAL;
-		goto exit;
-	}
+	if (!bufu)
+		return -EINVAL;
 
-	if (!access_ok(VERIFY_WRITE, bufu, count)) {
-		ret = -EFAULT;
-		goto exit;
-	}
+	if (!access_ok(VERIFY_WRITE, bufu, count))
+		return -EFAULT;
 
 	if (*ppos >= data->len && data->len == 0)
 		data->len = msm_pc_debug_counters_copy(data);
 
-	ret = simple_read_from_buffer(bufu, count, ppos,
+	return simple_read_from_buffer(bufu, count, ppos,
 			data->buf, data->len);
-exit:
-	mutex_unlock(&msm_pc_debug_mutex);
-	return ret;
 }
 
 static int msm_pc_debug_counters_file_open(struct inode *inode,
 		struct file *file)
 {
 	struct msm_pc_debug_counters_buffer *buf;
-	int ret = 0;
 
-	mutex_lock(&msm_pc_debug_mutex);
 
-	if (!inode->i_private) {
-		ret = -EINVAL;
-		goto exit;
-	}
+	if (!inode->i_private)
+		return -EINVAL;
 
 	file->private_data = kzalloc(
 		sizeof(struct msm_pc_debug_counters_buffer), GFP_KERNEL);
@@ -769,24 +764,19 @@ static int msm_pc_debug_counters_file_open(struct inode *inode,
 		pr_err("%s: ERROR kmalloc failed to allocate %zu bytes\n",
 		__func__, sizeof(struct msm_pc_debug_counters_buffer));
 
-		ret = -ENOMEM;
-		goto exit;
+		return -ENOMEM;
 	}
 
 	buf = file->private_data;
 	buf->reg = (long *)inode->i_private;
 
-exit:
-	mutex_unlock(&msm_pc_debug_mutex);
-	return ret;
+	return 0;
 }
 
 static int msm_pc_debug_counters_file_close(struct inode *inode,
 		struct file *file)
 {
-	mutex_lock(&msm_pc_debug_mutex);
 	kfree(file->private_data);
-	mutex_unlock(&msm_pc_debug_mutex);
 	return 0;
 }
 
@@ -913,7 +903,7 @@ static int __init msm_pm_drv_init(void)
 	if (rc)
 		pr_err("%s(): failed to register driver %s\n", __func__,
 				msm_cpu_pm_snoc_client_driver.driver.name);
-	return rc;
+		return rc;
 }
 late_initcall(msm_pm_drv_init);
 

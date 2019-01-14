@@ -87,7 +87,6 @@ struct mmc_ios {
 /* states to represent load on the host */
 enum mmc_load {
 	MMC_LOAD_HIGH,
-	MMC_LOAD_INIT,
 	MMC_LOAD_LOW,
 };
 
@@ -404,8 +403,6 @@ struct mmc_host {
 	struct mmc_supply	supply;
 
 	struct dentry		*debugfs_root;
-
-	bool			err_occurred;
 
 	struct mmc_async_req	*areq;		/* active async req */
 	struct mmc_context_info	context_info;	/* async synchronization info */

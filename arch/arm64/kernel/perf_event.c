@@ -358,7 +358,7 @@ out:
 
 static int
 validate_event(struct pmu *pmu, struct pmu_hw_events *hw_events,
-				struct perf_event *event)
+	       struct perf_event *event)
 {
 	struct arm_pmu *armpmu;
 	struct hw_perf_event fake_event = event->hw;
@@ -366,7 +366,6 @@ validate_event(struct pmu *pmu, struct pmu_hw_events *hw_events,
 
 	if (is_software_event(event))
 		return 1;
-
 	/*
 	 * Reject groups spanning multiple HW PMUs (e.g. CPU + CCI). The
 	 * core perf code won't check that the pmu->ctx == leader->ctx
@@ -618,6 +617,7 @@ static void __init armpmu_init(struct arm_pmu *armpmu)
 		.start		= armpmu_start,
 		.stop		= armpmu_stop,
 		.read		= armpmu_read,
+		.events_across_hotplug = 1,
 	};
 }
 

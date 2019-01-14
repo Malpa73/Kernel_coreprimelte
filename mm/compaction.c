@@ -419,44 +419,19 @@ static void acct_isolated(struct zone *zone, bool locked, struct compact_control
 	}
 }
 
-static bool __too_many_isolated(struct zone *zone, int safe)
+/* Similar to reclaim, but different enough that they don't share logic */
+static bool too_many_isolated(struct zone *zone)
 {
 	unsigned long active, inactive, isolated;
 
-	if (safe) {
-		inactive = zone_page_state_snapshot(zone, NR_INACTIVE_FILE) +
-			zone_page_state_snapshot(zone, NR_INACTIVE_ANON);
-		active = zone_page_state_snapshot(zone, NR_ACTIVE_FILE) +
-			zone_page_state_snapshot(zone, NR_ACTIVE_ANON);
-		isolated = zone_page_state_snapshot(zone, NR_ISOLATED_FILE) +
-			zone_page_state_snapshot(zone, NR_ISOLATED_ANON);
-	} else {
-		inactive = zone_page_state(zone, NR_INACTIVE_FILE) +
-			zone_page_state(zone, NR_INACTIVE_ANON);
-		active = zone_page_state(zone, NR_ACTIVE_FILE) +
-			zone_page_state(zone, NR_ACTIVE_ANON);
-		isolated = zone_page_state(zone, NR_ISOLATED_FILE) +
-			zone_page_state(zone, NR_ISOLATED_ANON);
-	}
+	inactive = zone_page_state(zone, NR_INACTIVE_FILE) +
+					zone_page_state(zone, NR_INACTIVE_ANON);
+	active = zone_page_state(zone, NR_ACTIVE_FILE) +
+					zone_page_state(zone, NR_ACTIVE_ANON);
+	isolated = zone_page_state(zone, NR_ISOLATED_FILE) +
+					zone_page_state(zone, NR_ISOLATED_ANON);
 
 	return isolated > (inactive + active) / 2;
-}
-
-/* Similar to reclaim, but different enough that they don't share logic */
-static bool too_many_isolated(struct compact_control *cc)
-{
-	/*
-	 * __too_many_isolated(safe=0) is fast but inaccurate, because it
-	 * doesn't account for the vm_stat_diff[] counters.  So if it looks
-	 * like too_many_isolated() is about to return true, fall back to the
-	 * slower, more accurate zone_page_state_snapshot().
-	 */
-	if (unlikely(__too_many_isolated(cc->zone, 0))) {
-		if (cc->sync)
-			return __too_many_isolated(cc->zone, 1);
-	}
-
-	return false;
 }
 
 /**
@@ -497,7 +472,7 @@ isolate_migratepages_range(struct zone *zone, struct compact_control *cc,
 	 * list by either parallel reclaimers or compaction. If there are,
 	 * delay for some time until fewer pages are isolated
 	 */
-	while (unlikely(too_many_isolated(cc))) {
+	while (unlikely(too_many_isolated(zone))) {
 		/* async migration should just abort */
 		if (!cc->sync)
 			return 0;
@@ -995,7 +970,7 @@ static int compact_zone(struct zone *zone, struct compact_control *cc)
 	 */
 	cc->migrate_pfn = zone->compact_cached_migrate_pfn;
 	cc->free_pfn = zone->compact_cached_free_pfn;
-	if (cc->free_pfn < start_pfn || cc->free_pfn > end_pfn) {
+	if (cc->free_pfn < start_pfn || cc->free_pfn >= end_pfn) {
 		cc->free_pfn = end_pfn & ~(pageblock_nr_pages-1);
 		zone->compact_cached_free_pfn = cc->free_pfn;
 	}
@@ -1154,6 +1129,14 @@ static void __compact_pgdat(pg_data_t *pgdat, struct compact_control *cc)
 		INIT_LIST_HEAD(&cc->freepages);
 		INIT_LIST_HEAD(&cc->migratepages);
 
+		/*
+		 * When called via /proc/sys/vm/compact_memory
+		 * this makes sure we compact the whole zone regardless of
+		 * cached scanner positions.
+		 */
+		if (cc->order == -1)
+			__reset_isolation_suitable(zone);
+
 		if (cc->order == -1 || !compaction_deferred(zone, cc->order))
 			compact_zone(zone, cc);
 
@@ -1211,8 +1194,14 @@ int sysctl_compact_memory;
 int sysctl_compaction_handler(struct ctl_table *table, int write,
 			void __user *buffer, size_t *length, loff_t *ppos)
 {
-	if (write)
+	if (write) {
+		sysctl_compact_memory++;
 		compact_nodes();
+		pr_info("compact_memory done.(%d times so far)\n",
+			sysctl_compact_memory);
+	}
+	else
+		proc_dointvec(table, write, buffer, length, ppos);
 
 	return 0;
 }

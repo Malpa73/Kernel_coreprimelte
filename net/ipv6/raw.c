@@ -482,7 +482,7 @@ static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 			goto csum_copy_err;
 		err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 	} else {
-		err = skb_copy_and_csum_datagram_iovec(skb, 0, msg->msg_iov);
+		err = skb_copy_and_csum_datagram_iovec(skb, 0, msg->msg_iov, copied);
 		if (err == -EINVAL)
 			goto csum_copy_err;
 	}
@@ -905,7 +905,7 @@ done:
 out:
 	fl6_sock_release(flowlabel);
 	txopt_put(opt_to_free);
-	return err < 0 ? err : len;
+	return err<0?err:len;
 do_confirm:
 	dst_confirm(dst);
 	if (!(msg->msg_flags & MSG_PROBE) || len)

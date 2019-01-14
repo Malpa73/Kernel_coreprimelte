@@ -109,13 +109,6 @@ static int32_t qdsp_apr_callback(struct apr_client_data *data, void *priv)
 		} else if (data->reset_proc == APR_DEST_MODEM) {
 			pr_debug("%s: Received Modem reset event\n", __func__);
 		}
-		/* Set the remaining member variables to default values
-			for RESET_EVENTS */
-		data->payload_size = 0;
-		data->payload = NULL;
-		data->src_port = 0;
-		data->dest_port = 0;
-		data->token = 0;
 	}
 
 	spin_lock_irqsave(&prtd->response_lock, spin_flags);
@@ -370,7 +363,7 @@ static ssize_t voice_svc_write(struct file *file, const char __user *buf,
 	uint32_t cmd;
 	struct voice_svc_register *register_data = NULL;
 	struct voice_svc_cmd_request *request_data = NULL;
-	uint32_t request_payload_size;
+	uint32_t request_payload_size;	
 
 	pr_debug("%s\n", __func__);
 

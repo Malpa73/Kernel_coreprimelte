@@ -1476,7 +1476,6 @@ static inline bool can_follow_write_pte(pte_t pte, unsigned int flags)
 	return pte_write(pte) ||
 		((flags & FOLL_FORCE) && (flags & FOLL_COW) && pte_dirty(pte));
 }
-
 /**
  * follow_page_mask - look up a page descriptor from a user-virtual address
  * @vma: vm_area_struct mapping @address
@@ -3175,8 +3174,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	mem_cgroup_commit_charge_swapin(page, ptr);
 
 	swap_free(entry);
-	if ((PageSwapCache(page) && vm_swap_full(page_swap_info(page))) ||
-		(vma->vm_flags & VM_LOCKED) || PageMlocked(page))
+	if (vm_swap_full() || (vma->vm_flags & VM_LOCKED) || PageMlocked(page))
 		try_to_free_swap(page);
 	unlock_page(page);
 	if (page != swapcache) {
@@ -3752,10 +3750,11 @@ int handle_pte_fault(struct mm_struct *mm,
 	if (!pte_present(entry)) {
 		if (pte_none(entry)) {
 			if (vma->vm_ops)
-				return do_linear_fault(mm, vma, address,
-						pte, pmd, flags, entry);
-			return do_anonymous_page(mm, vma, address,
-						 pte, pmd, flags);
+				return do_linear_fault(mm, vma, address, pte, pmd,
+						flags, entry);
+
+			return do_anonymous_page(mm, vma, address, pte, pmd,
+					flags);
 		}
 		if (pte_file(entry))
 			return do_nonlinear_fault(mm, vma, address,

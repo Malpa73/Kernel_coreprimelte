@@ -35,6 +35,13 @@
 
 #include <asm/fb.h>
 
+/******************************************/
+/* Customizing Code for DCT(Display Clock Tunning) */
+#ifdef CONFIG_SEC_DISP_CLK_TUNNING
+#include <linux/sec_dct.h>
+extern struct sec_dct_info_t *sec_dct_info;
+#endif
+/******************************************/
 
     /*
      *  Frame buffer device initialization and setup routines
@@ -1087,13 +1094,6 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 	void __user *argp = (void __user *)arg;
 	long ret = 0;
 
-	memset(&var, 0, sizeof(var));
-	memset(&fix, 0, sizeof(fix));
-	memset(&con2fb, 0, sizeof(con2fb));
-	memset(&cmap_from, 0, sizeof(cmap_from));
-	memset(&cmap, 0, sizeof(cmap));
-	memset(&event, 0, sizeof(event));
-
 	switch (cmd) {
 	case FBIOGET_VSCREENINFO:
 		if (!lock_fb_info(info))
@@ -1198,9 +1198,47 @@ static long do_fb_ioctl(struct fb_info *info, unsigned int cmd,
 		if (!lock_fb_info(info))
 			return -ENODEV;
 		console_lock();
+#ifdef CONFIG_SEC_DISP_CLK_TUNNING
+		/******************************************/
+		/* Customizing Code for DCT(Display Clock Tunning) */
+		if (unlikely(sec_dct_info) && unlikely(!sec_dct_info->ref_addr))
+			/************************************************/
+			/* (optional)
+			  * This function must be located in appropriate position
+			  * to initialize DCT Data by using reference address
+			  * in accordance with the specification of each BB platform	*/
+			/************************************************/
+			sec_dct_info->ref_addr = (void *)info;
+		/******************************************/
+#endif
+#ifdef CONFIG_SEC_DISP_CLK_TUNNING
+		/******************************************/
+		/* Customizing Code for DCT(Display Clock Tunning) */
+		DCT_LOG("[DCT][%s] call fb_blank (%lu)\n", __func__, arg);
+		if (unlikely(sec_dct_info) && unlikely(sec_dct_info->enabled)
+			&& (arg != FB_BLANK_UNBLANK))
+			/******************************************/
+			/* This function must be located in appropriate SETTING position
+			  * in accordance with the specification of each BB platform	*/
+			/******************************************/
+			sec_dct_info->applyData();
+		/******************************************/
+#endif
 		info->flags |= FBINFO_MISC_USEREVENT;
 		ret = fb_blank(info, arg);
 		info->flags &= ~FBINFO_MISC_USEREVENT;
+#ifdef CONFIG_SEC_DISP_CLK_TUNNING
+		/******************************************/
+		/* Customizing Code for DCT(Display Clock Tunning) */
+		if (unlikely(sec_dct_info) && unlikely(sec_dct_info->enabled)
+			&& (arg != FB_BLANK_UNBLANK))
+			/************************************************/
+			/* This function must be located in appropriate END position
+			  * in accordance with the specification of each BB platform	*/
+			/************************************************/
+			sec_dct_info->finish_applyData();
+		/******************************************/
+#endif
 		console_unlock();
 		unlock_fb_info(info);
 		break;

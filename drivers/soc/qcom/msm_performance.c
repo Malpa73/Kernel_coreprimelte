@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -33,7 +33,6 @@ struct cpu_hp {
 	cpumask_var_t offlined_cpus;
 };
 static struct cpu_hp **managed_clusters;
-static bool clusters_inited;
 
 /* Work to evaluate the onlining/offlining CPUs */
 struct delayed_work evaluate_hotplug_work;
@@ -84,7 +83,7 @@ static int set_max_cpus(const char *buf, const struct kernel_param *kp)
 	const char *cp = buf;
 	int val;
 
-	if (!clusters_inited)
+	if (!num_clusters)
 		return -EINVAL;
 
 	while ((cp = strpbrk(cp + 1, ":")))
@@ -118,7 +117,7 @@ static int get_max_cpus(char *buf, const struct kernel_param *kp)
 {
 	int i, cnt = 0;
 
-	if (!clusters_inited)
+	if (!num_clusters)
 		return cnt;
 
 	for (i = 0; i < num_clusters; i++)
@@ -134,16 +133,14 @@ static const struct kernel_param_ops param_ops_max_cpus = {
 	.get = get_max_cpus,
 };
 
-#ifdef CONFIG_MSM_PERFORMANCE_HOTPLUG_ON
 device_param_cb(max_cpus, &param_ops_max_cpus, NULL, 0644);
-#endif
 
 static int set_managed_cpus(const char *buf, const struct kernel_param *kp)
 {
 	int i, ret;
 	struct cpumask tmp_mask;
 
-	if (!clusters_inited)
+	if (!num_clusters)
 		return -EINVAL;
 
 	ret = cpulist_parse(buf, &tmp_mask);
@@ -168,7 +165,7 @@ static int get_managed_cpus(char *buf, const struct kernel_param *kp)
 {
 	int i, cnt = 0;
 
-	if (!clusters_inited)
+	if (!num_clusters)
 		return cnt;
 
 	for (i = 0; i < num_clusters; i++) {
@@ -195,7 +192,7 @@ static int get_managed_online_cpus(char *buf, const struct kernel_param *kp)
 	struct cpumask tmp_mask;
 	struct cpu_hp *i_cpu_hp;
 
-	if (!clusters_inited)
+	if (!num_clusters)
 		return cnt;
 
 	for (i = 0; i < num_clusters; i++) {
@@ -219,11 +216,9 @@ static int get_managed_online_cpus(char *buf, const struct kernel_param *kp)
 static const struct kernel_param_ops param_ops_managed_online_cpus = {
 	.get = get_managed_online_cpus,
 };
-
-#ifdef CONFIG_MSM_PERFORMANCE_HOTPLUG_ON
 device_param_cb(managed_online_cpus, &param_ops_managed_online_cpus,
-							NULL, 0444);
-#endif
+								NULL, 0444);
+
 /*
  * Userspace sends cpu#:min_freq_value to vote for min_freq_value as the new
  * scaling_min. To withdraw its vote it needs to enter cpu#:0
@@ -429,9 +424,6 @@ static void __ref try_hotplug(struct cpu_hp *data)
 {
 	unsigned int i;
 
-	if (!clusters_inited)
-		return;
-
 	pr_debug("msm_perf: Trying hotplug...%d:%d\n",
 			num_online_managed(data->cpus),	num_online_cpus());
 
@@ -514,9 +506,6 @@ static int __ref msm_performance_cpu_callback(struct notifier_block *nfb,
 	unsigned int i;
 	struct cpu_hp *i_hp = NULL;
 
-	if (!clusters_inited)
-		return NOTIFY_OK;
-
 	for (i = 0; i < num_clusters; i++) {
 		if (managed_clusters[i]->cpus == NULL)
 			return NOTIFY_OK;
@@ -589,13 +578,25 @@ static int init_cluster_control(void)
 			return -ENOMEM;
 		}
 
+		if (!alloc_cpumask_var(&managed_clusters[i]->cpus,
+					GFP_KERNEL)) {
+			pr_err("msm_perf:Cluster %u cpu alloc failed\n",
+					i);
+			return -ENOMEM;
+		}
+		if (!alloc_cpumask_var(&managed_clusters[i]->offlined_cpus,
+					GFP_KERNEL)) {
+			pr_err("msm_perf:Cluster %u off_cpus alloc failed\n",
+					i);
+			return -ENOMEM;
+		}
+
 		managed_clusters[i]->max_cpu_request = -1;
 	}
 
 	INIT_DELAYED_WORK(&evaluate_hotplug_work, check_cluster_status);
 	mutex_init(&managed_cpus_lock);
 
-	clusters_inited = true;
 	return 0;
 }
 

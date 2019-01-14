@@ -591,11 +591,6 @@ int rmnet_vnd_create_dev(int id, struct net_device **new_device,
 		return RMNET_CONFIG_NOMEM;
 	}
 
-	if (!prefix) {
-		/* Configuring UL checksum offload on rmnet_data interfaces */
-		dev->hw_features = NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
-	}
-
 	rc = register_netdevice(dev);
 	if (rc != 0) {
 		LOGE("Failed to to register netdev [%s]", dev->name);
@@ -921,7 +916,7 @@ int rmnet_vnd_add_tc_flow(uint32_t id, uint32_t map_flow, uint32_t tc_flow)
 	list_add(&(itm->list), &(dev_conf->flow_head));
 	write_unlock_irqrestore(&dev_conf->flow_map_lock, flags);
 
-	LOGD("Created flow mapping [%s][0x%08X][0x%08X]@%pK",
+	LOGD("Created flow mapping [%s][0x%08X][0x%08X]@%p",
 	     dev->name, itm->map_flow_id, itm->tc_flow_id[0], itm);
 
 	return RMNET_CONFIG_OK;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,7 +37,7 @@
 
 struct msm_vidc_drv *vidc_driver;
 
-uint32_t msm_vidc_pwr_collapse_delay = 10000;
+uint32_t msm_vidc_pwr_collapse_delay = 2000;
 
 static inline struct msm_vidc_inst *get_vidc_inst(struct file *filp, void *fh)
 {
@@ -737,7 +737,6 @@ static int __init msm_vidc_init(void)
 	if (rc) {
 		dprintk(VIDC_ERR,
 			"Failed to register platform driver\n");
-		debugfs_remove_recursive(vidc_driver->debugfs_root);
 		kfree(vidc_driver);
 		vidc_driver = NULL;
 	}

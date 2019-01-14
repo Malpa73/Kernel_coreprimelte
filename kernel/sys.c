@@ -45,7 +45,9 @@
 #include <linux/mm.h>
 #include <linux/mempolicy.h>
 #include <linux/sched.h>
-
+#ifdef CONFIG_RESTART_REASON_SEC_PARAM
+#include <linux/sec_debug.h>
+#endif
 #include <linux/compat.h>
 #include <linux/syscalls.h>
 #include <linux/kprobes.h>
@@ -330,6 +332,7 @@ void kernel_restart_prepare(char *cmd)
 {
 	blocking_notifier_call_chain(&reboot_notifier_list, SYS_RESTART, cmd);
 	system_state = SYSTEM_RESTART;
+	freeze_processes();
 	usermodehelper_disable();
 	device_shutdown();
 }
@@ -398,6 +401,9 @@ static void migrate_to_reboot_cpu(void)
  */
 void kernel_restart(char *cmd)
 {
+#ifdef CONFIG_RESTART_REASON_SEC_PARAM
+	sec_param_restart_reason(cmd);
+#endif
 	kernel_restart_prepare(cmd);
 	migrate_to_reboot_cpu();
 	syscore_shutdown();
@@ -415,6 +421,7 @@ static void kernel_shutdown_prepare(enum system_states state)
 	blocking_notifier_call_chain(&reboot_notifier_list,
 		(state == SYSTEM_HALT)?SYS_HALT:SYS_POWER_OFF, NULL);
 	system_state = state;
+	freeze_processes();
 	usermodehelper_disable();
 	device_shutdown();
 }
@@ -2427,12 +2434,12 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
 		if (arg2 != 1 || arg3 || arg4 || arg5)
 			return -EINVAL;
 
-		task_set_no_new_privs(current);
+		current->no_new_privs = 1;
 		break;
 	case PR_GET_NO_NEW_PRIVS:
 		if (arg2 || arg3 || arg4 || arg5)
 			return -EINVAL;
-		return task_no_new_privs(current) ? 1 : 0;
+		return current->no_new_privs ? 1 : 0;
 	case PR_SET_VMA:
 		error = prctl_set_vma(arg2, arg3, arg4, arg5);
 		break;
