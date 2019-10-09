@@ -47,14 +47,10 @@
 #include <linux/sched/sysctl.h>
 #include <linux/sched/rt.h>
 #include <linux/timer.h>
-#include <linux/freezer.h>
 
 #include <asm/uaccess.h>
 
 #include <trace/events/timer.h>
-#ifdef CONFIG_SEC_DEBUG
-#include <mach/sec_debug.h>
-#endif
 
 /*
  * The timer bases:
@@ -844,8 +840,6 @@ u64 hrtimer_forward(struct hrtimer *timer, ktime_t now, ktime_t interval)
 	u64 orun = 1;
 	ktime_t delta;
 
-	WARN_ON(hrtimer_is_queued(timer));
-
 	delta = ktime_sub(now, hrtimer_get_expires(timer));
 
 	if (delta.tv64 < 0)
@@ -1257,13 +1251,7 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	 */
 	raw_spin_unlock(&cpu_base->lock);
 	trace_hrtimer_expire_entry(timer, now);
-#ifdef CONFIG_SEC_DEBUG
-	secdbg_msg("hrtimer %pS entry", fn);
-#endif
 	restart = fn(timer);
-#ifdef CONFIG_SEC_DEBUG
-	secdbg_msg("hrtimer %pS exit", fn);
-#endif
 	trace_hrtimer_expire_exit(timer);
 	raw_spin_lock(&cpu_base->lock);
 
@@ -1555,7 +1543,7 @@ static int __sched do_nanosleep(struct hrtimer_sleeper *t, enum hrtimer_mode mod
 			t->task = NULL;
 
 		if (likely(t->task))
-			freezable_schedule();
+			schedule();
 
 		hrtimer_cancel(&t->timer);
 		mode = HRTIMER_MODE_ABS;

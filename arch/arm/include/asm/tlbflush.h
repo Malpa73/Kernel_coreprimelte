@@ -338,14 +338,6 @@ static inline void local_flush_tlb_all(void)
 	}
 }
 
-static inline void local_flush_tlb_all_non_is(void)
-{
-	dsb();
-	asm("mcr p15, 0, %0, c8, c7, 0" : : "r" (0));
-	dsb();
-	isb();
-}
-
 static inline void local_flush_tlb_mm(struct mm_struct *mm)
 {
 	const int zero = 0;
@@ -400,7 +392,7 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
 	tlb_op(TLB_V6_U_PAGE, "c8, c7, 1", uaddr);
 	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", uaddr);
 	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", uaddr);
-#if defined(CONFIG_ARM_ERRATA_720789) || defined(CONFIG_ARCH_MSM8X60)
+#ifdef CONFIG_ARM_ERRATA_720789
 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 3", uaddr & PAGE_MASK);
 #else
 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 1", uaddr);
@@ -429,11 +421,7 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
 	tlb_op(TLB_V6_U_PAGE, "c8, c7, 1", kaddr);
 	tlb_op(TLB_V6_D_PAGE, "c8, c6, 1", kaddr);
 	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", kaddr);
-#ifdef CONFIG_ARCH_MSM8X60
-	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 3", kaddr);
-#else
 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 1", kaddr);
-#endif
 
 	if (tlb_flag(TLB_BARRIER)) {
 		dsb();
@@ -515,7 +503,6 @@ static inline void clean_pmd_entry(void *pmd)
 
 #ifndef CONFIG_SMP
 #define flush_tlb_all		local_flush_tlb_all
-#define flush_tlb_all_non_is	local_flush_tlb_all_non_is
 #define flush_tlb_mm		local_flush_tlb_mm
 #define flush_tlb_page		local_flush_tlb_page
 #define flush_tlb_kernel_page	local_flush_tlb_kernel_page

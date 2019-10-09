@@ -105,8 +105,6 @@ extern char core_pattern[];
 extern unsigned int core_pipe_limit;
 #endif
 extern int pid_max;
-extern int extra_free_kbytes;
-extern int min_free_order_shift;
 extern int pid_max_min, pid_max_max;
 extern int percpu_pagelist_fraction;
 extern int compat_log;
@@ -131,9 +129,6 @@ static int __maybe_unused two = 2;
 static int __maybe_unused three = 3;
 static unsigned long one_ul = 1;
 static int one_hundred = 100;
-#ifdef CONFIG_INCREASE_MAXIMUM_SWAPPINESS
-static int max_swappiness = 200;
-#endif
 #ifdef CONFIG_PRINTK
 static int ten_thousand = 10000;
 #endif
@@ -285,138 +280,6 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
-	{
-		.procname	= "sched_wake_to_idle",
-		.data		= &sysctl_sched_wake_to_idle,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-#ifdef CONFIG_SCHED_FREQ_INPUT
-	{
-		.procname	= "sched_freq_inc_notify_slack_pct",
-		.data		= &sysctl_sched_freq_inc_notify_slack_pct,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-	{
-		.procname	= "sched_freq_dec_notify_slack_pct",
-		.data		= &sysctl_sched_freq_dec_notify_slack_pct,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-#endif
-#if defined(CONFIG_SCHED_FREQ_INPUT) || defined(CONFIG_SCHED_HMP)
-	{
-		.procname       = "sched_account_wait_time",
-		.data           = &sysctl_sched_account_wait_time,
-		.maxlen         = sizeof(unsigned int),
-		.mode           = 0644,
-		.proc_handler   = sched_acct_wait_time_update_handler,
-	},
-	{
-		.procname       = "sched_ravg_hist_size",
-		.data           = &sysctl_sched_ravg_hist_size,
-		.maxlen         = sizeof(unsigned int),
-		.mode           = 0644,
-		.proc_handler   = sched_ravg_hist_size_update_handler,
-	},
-	{
-		.procname       = "sched_window_stats_policy",
-		.data           = &sysctl_sched_window_stats_policy,
-		.maxlen         = sizeof(unsigned int),
-		.mode           = 0644,
-		.proc_handler   = sched_window_stats_policy_update_handler,
-	},
-	{
-		.procname	= "sched_wakeup_load_threshold",
-		.data		= &sysctl_sched_wakeup_load_threshold,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-#endif
-#ifdef CONFIG_SCHED_HMP
-	{
-		.procname	= "sched_small_task",
-		.data		= &sysctl_sched_small_task_pct,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= sched_hmp_proc_update_handler,
-	},
-	{
-		.procname	= "sched_mostly_idle_load",
-		.data		= &sysctl_sched_mostly_idle_load_pct,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= sched_hmp_proc_update_handler,
-	},
-	{
-		.procname	= "sched_mostly_idle_nr_run",
-		.data		= &sysctl_sched_mostly_idle_nr_run,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-	{
-		.procname	= "sched_spill_load",
-		.data		= &sysctl_sched_spill_load_pct,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= sched_hmp_proc_update_handler,
-	},
-	{
-		.procname	= "sched_spill_nr_run",
-		.data		= &sysctl_sched_spill_nr_run,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-	{
-		.procname	= "sched_upmigrate",
-		.data		= &sysctl_sched_upmigrate_pct,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= sched_hmp_proc_update_handler,
-	},
-	{
-		.procname	= "sched_downmigrate",
-		.data		= &sysctl_sched_downmigrate_pct,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= sched_hmp_proc_update_handler,
-	},
-	{
-		.procname	= "sched_upmigrate_min_nice",
-		.data		= &sysctl_sched_upmigrate_min_nice,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
-	},
-	{
-		.procname	= "sched_init_task_load",
-		.data		= &sysctl_sched_init_task_load_pct,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= sched_hmp_proc_update_handler,
-	},
-	{
-		.procname	= "sched_power_band_limit",
-		.data		= &sysctl_sched_powerband_limit_pct,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= sched_hmp_proc_update_handler,
-	},
-	{
-		.procname	= "sched_boost",
-		.data		= &sysctl_sched_boost,
-		.maxlen		= sizeof(unsigned int),
-		.mode		= 0644,
-		.proc_handler	= sched_boost_handler,
-	},
-#endif	/* CONFIG_SCHED_HMP */
 #ifdef CONFIG_SCHED_DEBUG
 	{
 		.procname	= "sched_min_granularity_ns",
@@ -1200,27 +1063,6 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= proc_dointvec,
 	},
 #endif
-#if defined(CONFIG_ARM) || defined(CONFIG_ARM64)
-	{
-		.procname	= "boot_reason",
-		.data		= &boot_reason,
-		.maxlen		= sizeof(int),
-		.mode		= 0444,
-		.proc_handler	= proc_dointvec,
-	},
-
-	{
-		.procname	= "cold_boot",
-		.data		= &cold_boot,
-		.maxlen		= sizeof(int),
-		.mode		= 0444,
-		.proc_handler	= proc_dointvec,
-	},
-#endif
-/*
- * NOTE: do not add new entries to this table unless you have read
- * Documentation/sysctl/ctl_unnumbered.txt
- */
 	{ }
 };
 
@@ -1333,11 +1175,7 @@ static struct ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
-#ifdef CONFIG_INCREASE_MAXIMUM_SWAPPINESS
-		.extra2		= &max_swappiness,
-#else
 		.extra2		= &one_hundred,
-#endif
 	},
 #ifdef CONFIG_HUGETLB_PAGE
 	{
@@ -1426,21 +1264,6 @@ static struct ctl_table vm_table[] = {
 		.mode		= 0644,
 		.proc_handler	= min_free_kbytes_sysctl_handler,
 		.extra1		= &zero,
-	},
-	{
-		.procname	= "extra_free_kbytes",
-		.data		= &extra_free_kbytes,
-		.maxlen		= sizeof(extra_free_kbytes),
-		.mode		= 0644,
-		.proc_handler	= min_free_kbytes_sysctl_handler,
-		.extra1		= &zero,
-	},
-	{
-		.procname	= "min_free_order_shift",
-		.data		= &min_free_order_shift,
-		.maxlen		= sizeof(min_free_order_shift),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec
 	},
 	{
 		.procname	= "percpu_pagelist_fraction",

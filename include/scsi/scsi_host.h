@@ -681,11 +681,6 @@ struct Scsi_Host {
 	unsigned no_write_same:1;
 
 	/*
-	 * Set "SELECT REPORT" field to allow detection of well known logical
-	 * units along with standard LUs.
-	 */
-	unsigned report_wlus:1;
-	/*
 	 * Optional work queue to be utilized by the transport
 	 */
 	char work_q_name[20];
@@ -744,9 +739,6 @@ struct Scsi_Host {
 	 * Needed just in case we have virtual hosts.
 	 */
 	struct device *dma_dev;
-#ifdef CONFIG_USB_STORAGE_DETECT
-	unsigned int  by_usb;
-#endif
 
 	/*
 	 * We should ensure that this is aligned, both for better performance

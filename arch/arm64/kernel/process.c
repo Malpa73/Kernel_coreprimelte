@@ -33,7 +33,6 @@
 #include <linux/kallsyms.h>
 #include <linux/init.h>
 #include <linux/cpu.h>
-#include <linux/cpuidle.h>
 #include <linux/elfcore.h>
 #include <linux/pm.h>
 #include <linux/tick.h>
@@ -82,7 +81,7 @@ void soft_restart(unsigned long addr)
 void (*pm_power_off)(void);
 EXPORT_SYMBOL_GPL(pm_power_off);
 
-void (*arm_pm_restart)(enum reboot_mode reboot_mode, const char *cmd);
+void (*arm_pm_restart)(char str, const char *cmd);
 EXPORT_SYMBOL_GPL(arm_pm_restart);
 
 void arch_cpu_idle_prepare(void)
@@ -99,18 +98,9 @@ void arch_cpu_idle(void)
 	 * This should do all the clock switching and wait for interrupt
 	 * tricks
 	 */
-	if (cpuidle_idle_call()) {
-		cpu_do_idle();
-		local_irq_enable();
-	}
+	cpu_do_idle();
+	local_irq_enable();
 }
-
-#ifdef CONFIG_HOTPLUG_CPU
-void arch_cpu_idle_dead(void)
-{
-       cpu_die();
-}
-#endif
 
 void machine_shutdown(void)
 {
@@ -142,7 +132,7 @@ void machine_restart(char *cmd)
 
 	/* Now call the architecture specific reboot code. */
 	if (arm_pm_restart)
-		arm_pm_restart(REBOOT_HARD, cmd);
+		arm_pm_restart('h', cmd);
 
 	/*
 	 * Whoops - the architecture was unable to reboot.
@@ -153,26 +143,15 @@ void machine_restart(char *cmd)
 
 void __show_regs(struct pt_regs *regs)
 {
-	int i, top_reg;
-	u64 lr, sp;
-
-	if (compat_user_mode(regs)) {
-		lr = regs->compat_lr;
-		sp = regs->compat_sp;
-		top_reg = 12;
-	} else {
-		lr = regs->regs[30];
-		sp = regs->sp;
-		top_reg = 29;
-	}
+	int i;
 
 	show_regs_print_info(KERN_DEFAULT);
 	print_symbol("PC is at %s\n", instruction_pointer(regs));
-	print_symbol("LR is at %s\n", lr);
+	print_symbol("LR is at %s\n", regs->regs[30]);
 	printk("pc : [<%016llx>] lr : [<%016llx>] pstate: %08llx\n",
-	       regs->pc, lr, regs->pstate);
-	printk("sp : %016llx\n", sp);
-	for (i = top_reg; i >= 0; i--) {
+	       regs->pc, regs->regs[30], regs->pstate);
+	printk("sp : %016llx\n", regs->sp);
+	for (i = 29; i >= 0; i--) {
 		printk("x%-2d: %016llx ", i, regs->regs[i]);
 		if (i % 2 == 0)
 			printk("\n");

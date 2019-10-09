@@ -22,7 +22,7 @@
  * the best guess is to add 0.5s.
  */
 
-int rtc_hctosys(void)
+static int __init rtc_hctosys(void)
 {
 	int err = -ENODEV;
 	struct rtc_time tm;
@@ -44,12 +44,6 @@ int rtc_hctosys(void)
 		goto err_read;
 
 	}
-
-	/*
-	 * Force update rtc year time to 2014
-	 * (The release year of device)
-	 */
-	tm.tm_year = 114;
 
 	err = rtc_valid_tm(&tm);
 	if (err) {
